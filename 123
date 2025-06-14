@@ -1,0 +1,217 @@
+--// 🔧 MM2 Tool Menu GUI with Aimbot, ESP, Noclip (Improved Version)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ⚙️ Config
+local TOOL_PRIORITY_NAME = "Knife"
+local TOOL_SECONDARY_NAME = "Revolver"
+local AIM_PART = "Head"
+
+-- 📦 Trạng thái
+local enableAimbot = true
+local enableESP = true
+local enableNoclip = false
+local menuVisible = true
+local cameraRotation = Vector2.new()
+
+local espFolder = Instance.new("Folder", workspace)
+espFolder.Name = "KnifeESP"
+
+-- 🖼️ GUI Menu
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ToolMM2Menu"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 180, 0, 140)
+mainFrame.Position = UDim2.new(0, 20, 0, 20)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Visible = menuVisible
+mainFrame.Parent = screenGui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "🔧 Tool MM2 Menu"
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 16
+title.Parent = mainFrame
+
+local UIList = Instance.new("UIListLayout")
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Padding = UDim.new(0, 5)
+UIList.Parent = mainFrame
+
+local function createToggleButton(name, emoji, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -10, 0, 30)
+	button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Text = emoji .. " Toggle " .. name
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 14
+	button.Parent = mainFrame
+	button.MouseButton1Click:Connect(callback)
+	return button
+end
+
+createToggleButton("Aimbot", "🎯", function()
+	enableAimbot = not enableAimbot
+end)
+
+createToggleButton("ESP", "👁️", function()
+	enableESP = not enableESP
+	if not enableESP then
+		for _, v in pairs(espFolder:GetChildren()) do v:Destroy() end
+	end
+end)
+
+createToggleButton("Noclip", "🚀", function()
+	enableNoclip = not enableNoclip
+end)
+
+-- 👀 Toggle GUI menu with CTRL
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.LeftControl then
+		menuVisible = not menuVisible
+		mainFrame.Visible = menuVisible
+	end
+end)
+
+-- 🔍 Tool Check
+local function hasTool(player, toolName)
+	local backpack = player:FindFirstChild("Backpack")
+	local character = player.Character
+	if backpack then
+		for _, t in ipairs(backpack:GetChildren()) do
+			if t:IsA("Tool") and t.Name == toolName then return true end
+		end
+	end
+	if character then
+		for _, t in ipairs(character:GetChildren()) do
+			if t:IsA("Tool") and t.Name == toolName then return true end
+		end
+	end
+	return false
+end
+
+-- 🧠 ESP
+local function removeESP(player)
+	local tag = espFolder:FindFirstChild(player.Name)
+	if tag then tag:Destroy() end
+end
+
+local function showESP(player, color)
+	if not player.Character then return end
+	local head = player.Character:FindFirstChild("Head")
+	if not head then return end
+	if espFolder:FindFirstChild(player.Name) then return end
+
+	local esp = Instance.new("BillboardGui")
+	esp.Name = player.Name
+	esp.Adornee = head
+	esp.Size = UDim2.new(0, 100, 0, 20)
+	esp.StudsOffset = Vector3.new(0, 2.5, 0)
+	esp.AlwaysOnTop = true
+	esp.LightInfluence = 0
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0.5
+	label.Text = player.Name
+	label.Font = Enum.Font.SourceSansBold
+	label.TextScaled = true
+	label.Parent = esp
+
+	esp.Parent = espFolder
+end
+
+-- 🎯 Get Closest Target
+local function getTarget()
+	local closestPlayer = nil
+	local shortestDistance = math.huge
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(AIM_PART) then
+			local targetPart = player.Character[AIM_PART]
+			local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+			if onScreen then
+				local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - UserInputService:GetMouseLocation()).Magnitude
+				if hasTool(player, TOOL_PRIORITY_NAME) then return player end
+				if distance < shortestDistance then
+					shortestDistance = distance
+					closestPlayer = player
+				end
+			end
+		end
+	end
+	return closestPlayer
+end
+
+-- 🔄 Noclip logic (CanCollide = false)
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+LocalPlayer.CharacterAdded:Connect(function(char)
+	character = char
+end)
+
+RunService.Stepped:Connect(function()
+	if enableNoclip and character then
+		for _, part in pairs(character:GetDescendants()) do
+			if part:IsA("BasePart") and part.CanCollide then
+				part.CanCollide = false
+			end
+		end
+	end
+end)
+
+-- ♻️ Main loop
+RunService.RenderStepped:Connect(function()
+	if enableESP then
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer then
+				removeESP(p)
+				local hasKnife = hasTool(p, TOOL_PRIORITY_NAME)
+				local hasRevolver = hasTool(p, TOOL_SECONDARY_NAME)
+				local localHasKnife = hasTool(LocalPlayer, TOOL_PRIORITY_NAME)
+				local localHasRevolver = hasTool(LocalPlayer, TOOL_SECONDARY_NAME)
+
+				if not localHasKnife and not localHasRevolver then
+					if hasKnife then showESP(p, Color3.fromRGB(255, 0, 0))
+					elseif hasRevolver then showESP(p, Color3.fromRGB(0, 255, 0)) end
+				elseif localHasKnife then
+					if hasKnife then showESP(p, Color3.fromRGB(255, 0, 0))
+					elseif hasRevolver then showESP(p, Color3.fromRGB(0, 0, 255))
+					else showESP(p, Color3.fromRGB(0, 255, 0)) end
+				elseif localHasRevolver then
+					if hasKnife then showESP(p, Color3.fromRGB(255, 0, 0)) end
+				end
+			end
+		end
+	end
+
+	if enableAimbot then
+		local character = LocalPlayer.Character
+		if character then
+			for _, obj in ipairs(character:GetChildren()) do
+				if obj:IsA("Tool") then
+					local target = getTarget()
+					if target and target.Character and target.Character:FindFirstChild(AIM_PART) then
+						Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character[AIM_PART].Position)
+					end
+					break
+				end
+			end
+		end
+	end
+end)
